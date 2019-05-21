@@ -1,21 +1,33 @@
 <?php
-class Renamer {
+/**
+ * $LeadManager->rename();      Ищет сделки в конктретной воронке, по названию - SEARH, удаляет из названия DESTROY
+ * $LeadManager->destroy_tag(); Находит в этой же воронке тег и удаляет его у сделки (обновляет сделку и теги в ней, 
+ * т.е. теги по сути новые, но фильтр фильтр по тегам работает корректно
+ */
+class LeadManager {
 
-	const USER 		= '';
-	const KEY 		= '';
-	const ACCOUNT 	= '';
-	const PIPE_ID	= '';
-	const SEARH  	= '/(\w+)*\s\(ТЕСТ\)/i';
-	const DESTROY 	= '/\s\(ТЕСТ\)/i';
+	const USER 			= '';
+	const KEY 			= '';
+	const ACCOUNT 		= '';
+	const PIPE_ID		= '';
+	const SEARH  		= '/(\w+)*\s\(ТЕСТ\)/i'; 	//присутствует в названии сделки
+	const DESTROY 		= '/\s\(ТЕСТ\)/i'; 			//удаляется из названиия сделки
+	const TAG_DESTROY	= 'ТЕСТ'; 					//искомый тэг
+
+	private $_leads_link;
+	private $_pipe_link;
 
 
-	public function go(){
-
-		$leads_link = 'https://' . self::ACCOUNT . '.amocrm.ru/api/v2/leads?';
-		$pipe_link  = 'https://' . self::ACCOUNT . '.amocrm.ru/api/v2/pipelines?id=' . self::PIPE_ID;
-
+	public function __construct()
+	{
 		$this->auth();
-		$pipe = $this->requset($pipe_link);
+		$this->_leads_link = 'https://' . self::ACCOUNT . '.amocrm.ru/api/v2/leads?';
+		$this->_pipe_link  = 'https://' . self::ACCOUNT . '.amocrm.ru/api/v2/pipelines?id=' . self::PIPE_ID;
+	}
+
+	private function getLeadsByPipline(){
+
+		$pipe = $this->requset($this->_pipe_link);
 		$statuses = $pipe['_embedded']['items'][self::PIPE_ID]['statuses'];
 		$get='';
 		foreach ($statuses as $status){
@@ -24,11 +36,17 @@ class Renamer {
 			}
 		}
 		$get = substr($get, 0, -1 );
-		$leads_status_link = $leads_link . $get;
+		$leads_status_link = $this->_leads_link . $get;
 
 		$leads = $this->requset($leads_status_link);
 		$leads = $leads['_embedded']['items'];
 
+		return $leads ? $leads : null;
+	}
+
+	public function rename(){
+
+		$leads = $this->getLeadsByPipline();
 		$date = mktime();
 		$send = [];
 		foreach ($leads as $lead) {
@@ -42,9 +60,41 @@ class Renamer {
 			}
 		}
 		if (!empty($send)){
-			$respone = $this->requset($leads_link, $send);
+			$respone = $this->requset($this->_leads_link, $send);
 		}
 		return $respone ? $respone : 'ни одной сделки не было переименовано.';
+	}
+
+	public function destroy_tag(){
+
+		$leads = $this->getLeadsByPipline();
+		$date = mktime();
+		$send =[];
+		foreach ($leads as $lead){
+			if ($lead['pipeline_id'] == self::PIPE_ID){
+				foreach ($lead['tags'] as $key=>$tag){
+					if ($tag['name'] == self::TAG_DESTROY) {
+						unset($lead['tags'][$key]);
+						$tags = $lead['tags'];
+						$names=[];
+						foreach ($tags as $t){
+							$names[] = $t['name'];
+						}
+						$names = implode(', ', $names);
+						$send['update'][] = [
+							'id' 		 => $lead['id'],
+							'updated_at' => $date,
+							'tags' 		 => $names
+						];
+					}
+				}
+			}
+		}
+		
+		if (!empty($send)){
+			$respone = $this->requset($this->_leads_link, $send);
+		}
+		return $respone ? $respone : 'нету тегов для удаления';
 	}
 
 	private function auth(){
@@ -103,8 +153,8 @@ class Renamer {
 	}
 }
 
-$a = new Renamer();
-$result = $a->go();
+$a = new LeadManager();
+$result = $a->destroy_tag();
 if (is_array($result)) {
 	echo '<pre>';
 	print_r($result);
