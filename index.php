@@ -14,6 +14,7 @@ class Renamer {
 		$leads_link = 'https://' . self::ACCOUNT . '.amocrm.ru/api/v2/leads?';
 		$pipe_link  = 'https://' . self::ACCOUNT . '.amocrm.ru/api/v2/pipelines?id=' . self::PIPE_ID;
 
+		$this->auth();
 		$pipe = $this->requset($pipe_link);
 		$statuses = $pipe['_embedded']['items'][self::PIPE_ID]['statuses'];
 		$get='';
