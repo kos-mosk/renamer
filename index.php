@@ -46,7 +46,7 @@ class Renamer {
 		return $respone ? $respone : 'ни одной сделки не было переименовано.';
 	}
 
-	public function auth(){
+	private function auth(){
 		$link = 'https://' . self::ACCOUNT . '.amocrm.ru/private/api/auth.php?type=json';
 		$user = [
 			'USER_LOGIN' => self::USER,
